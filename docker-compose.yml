@@ -20,7 +20,7 @@ services:
       prometheus.path: "/metrics"
       prometheus.port: "3000"
     networks:
-      - prometheus
+      - prometheus_net
 networks:
   prometheus_net:
     external: true
