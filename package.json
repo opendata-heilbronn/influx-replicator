@@ -1,0 +1,24 @@
+{
+  "name": "influx-replicator",
+  "version": "1.0.0",
+  "description": "Primary to secondary replication for influx dbs. Useful for off-site influxdb synchronization",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opendata-heilbronn/influx-replicator.git"
+  },
+  "author": "patrick246",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/opendata-heilbronn/influx-replicator/issues"
+  },
+  "homepage": "https://github.com/opendata-heilbronn/influx-replicator#readme",
+  "dependencies": {
+    "express": "^4.16.4",
+    "influx": "^5.0.7",
+    "prom-client": "^11.2.1"
+  }
+}

@@ -1,0 +1,32 @@
+variables:
+  IMAGE_NAME: repo.cfhn.it/infrastructure/influx-replicator/influx-replicator
+build:
+  image: docker:stable
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+  - docker:dind
+  stage: build
+  tags:
+  - build
+  script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN repo.cfhn.it
+  - docker build -t $IMAGE_NAME .
+  - docker push $IMAGE_NAME
+
+deploy_prod:
+  image:
+    name: docker/compose:1.22.0
+    entrypoint: [""]
+  stage: deploy
+  tags:
+  - deploy
+  script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN repo.cfhn.it
+  - docker-compose pull
+  - docker-compose up -d --no-build
+  environment:
+    name: production
+  only:
+  - master

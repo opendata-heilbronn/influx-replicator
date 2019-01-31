@@ -1,0 +1,26 @@
+version: '2'
+services:
+  replicator:
+    image: repo.cfhn.it/infrastructure/influx-replicator/influx-replicator
+    environment:
+      REPLICATOR_PRIMARY_HOST: 192.168.11.10
+      REPLICATOR_PRIMARY_PORT: 8086
+      REPLICATOR_PRIMARY_PROTO: http
+      REPLICATOR_PRIMARY_DATABASE: solar
+      REPLICATOR_PRIMARY_USERNAME:
+      REPLICATOR_PRIMARY_PASSWORD:
+      REPLICATOR_SECONDARY_HOST: influx.cfhn.it
+      REPLICATOR_SECONDARY_PORT: 443
+      REPLICATOR_SECONDARY_PROTO: https
+      REPLICATOR_SECONDARY_DATABASE: solar
+      REPLICATOR_SECONDARY_USERNAME: bugareplication
+      REPLICATOR_SECONDARY_PASSWORD: ${SERVER_INFLUX_PASSWORD}
+    labels:
+      prometheus.enable: "true"
+      prometheus.path: "/metrics"
+      prometheus.port: "3000"
+    networks:
+      - prometheus
+networks:
+  prometheus_net:
+    external: true

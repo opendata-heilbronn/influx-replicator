@@ -1,0 +1,10 @@
+version: '2'
+services:
+  primary:
+    image: influxdb
+    ports:
+      - 127.0.0.1:8086:8086
+  secondary:
+    image: influxdb
+    ports:
+      - 127.0.0.1:8087:8086
