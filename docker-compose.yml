@@ -21,6 +21,7 @@ services:
       prometheus.port: "3000"
     networks:
       - prometheus_net
+    restart: always
 networks:
   prometheus_net:
     external: true
