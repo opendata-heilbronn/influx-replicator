@@ -42,6 +42,11 @@ const synchronizedEntries = new prometheus.Counter({
 	help: 'Counter of synchronized entries'
 });
 
+const lastSyncTime = new prometheus.Gauge({
+	name: 'last_sync_time',
+	help: 'Timestamp of the last successful sync'
+});
+
 const flatten = list => list.reduce(
 	(a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []
 );
@@ -54,51 +59,62 @@ Array.prototype.flatMap = function (cb, thisArg) {
 prometheus.collectDefaultMetrics({timeout: 1000});
 
 async function sync() {
-	const measurements = await primary.getMeasurements(REPLICATOR_PRIMARY_DATABASE);
+	let timeout = 10000;
+	try {
+		const measurements = await primary.getMeasurements(REPLICATOR_PRIMARY_DATABASE);
 
-	let syncedEntries = 0;
-	for (let m of measurements) {
-		const series = await primary.getSeries({
-			measurement: m,
-			database: REPLICATOR_PRIMARY_DATABASE
-		});
-		const tags = series
-			.flatMap(line => line.split(/,/g).slice(1)
-				.map(tags => tags.split(/=/g)[0])
-			).reduce((prev, cur) => {
-				if (prev.findIndex(item => item === cur) !== -1) {
-					return prev;
+		let syncedEntries = 0;
+		for (let m of measurements) {
+			try {
+				const series = await primary.getSeries({
+					measurement: m,
+					database: REPLICATOR_PRIMARY_DATABASE
+				});
+				const tags = series
+					.flatMap(line => line.split(/,/g).slice(1)
+						.map(tags => tags.split(/=/g)[0])
+					).reduce((prev, cur) => {
+						if (prev.findIndex(item => item === cur) !== -1) {
+							return prev;
+						}
+						return [...prev, cur];
+					}, []);
+
+				const lastPrimary = await primary.query(`SELECT * FROM ${m} ORDER BY time DESC LIMIT 1`);
+				const fields = Object.keys(lastPrimary[0])
+					.filter(key => !tags.find(t => t === key))
+					.filter(val => val !== 'time');
+
+				let lastSecondary = (await secondary.query(`SELECT last(${fields[0]}) FROM ${m}`));
+				if (lastSecondary.length === 0) {
+					lastSecondary = [{time: Influx.toNanoDate('0')}];
 				}
-				return [...prev, cur];
-			}, []);
 
-		const lastPrimary = await primary.query(`SELECT * FROM ${m} ORDER BY time DESC LIMIT 1`);
-		const fields = Object.keys(lastPrimary[0])
-			.filter(key => !tags.find(t => t === key))
-			.filter(val => val !== 'time');
-
-		let lastSecondary = (await secondary.query(`SELECT last(${fields[0]}) FROM ${m}`));
-		if(lastSecondary.length === 0) {
-			lastSecondary = [{time: Influx.toNanoDate('0')}];
+				console.log('Measurement', m, 'Last primary', lastPrimary[0].time.toNanoISOString(), 'Last secondary', lastSecondary[0].time.toNanoISOString());
+				syncedEntries += await replicate(lastSecondary[0].time, m, tags, fields);
+			} catch (e) {
+				console.log('Error during measurement export', e)
+			}
 		}
 
-		console.log('Measurement', m, 'Last primary', lastPrimary[0].time.toNanoISOString(), 'Last secondary', lastSecondary[0].time.toNanoISOString());
-		syncedEntries += await replicate(lastSecondary[0].time, m, tags, fields);
+		synchronizedEntries.inc(syncedEntries);
+
+		if (syncedEntries > 0) {
+			timeout = 0;
+		}
+
+		lastSyncTime.setToCurrentTime();
+	} catch (e) {
+		console.log('Error during getting measurements', e);
 	}
 
-	synchronizedEntries.inc(syncedEntries);
-
-	if(syncedEntries !== 0) {
-		setTimeout(sync, 0);
-	} else {
-		setTimeout(sync, 10000);
-	}
+	setTimeout(sync, timeout);
 }
 
 function extractKeys(point, keys) {
 	let retTags = {};
-	for(let t of keys) {
-		if(point[t] !== null) {
+	for (let t of keys) {
+		if (point[t] !== null) {
 			retTags[t] = point[t];
 		}
 	}
@@ -106,12 +122,14 @@ function extractKeys(point, keys) {
 }
 
 async function replicate(lastSync, measurement, tags, fields) {
-	const data = await primary.query(`SELECT * FROM ${measurement} WHERE time >= ${lastSync.getNanoTime()} ORDER BY time ASC LIMIT 20000`);
-	if(data.length === 0) {
+	const data = await primary.query(`SELECT * FROM ${measurement} WHERE time > ${lastSync.getNanoTime()} ORDER BY time ASC LIMIT 20000`);
+	if (data.length === 0) {
 		return 0;
 	}
 
 	console.log('Syncing', data.length, 'entries');
+
+	console.log(data);
 	const sendData = data.map(point => ({
 		tags: extractKeys(point, tags),
 		fields: extractKeys(point, fields),
@@ -126,7 +144,7 @@ async function replicate(lastSync, measurement, tags, fields) {
 	return data.length;
 }
 
-(async function() {
+(async function () {
 	setTimeout(sync, 0);
 })();
 
