@@ -129,7 +129,6 @@ async function replicate(lastSync, measurement, tags, fields) {
 
 	console.log('Syncing', data.length, 'entries');
 
-	console.log(data);
 	const sendData = data.map(point => ({
 		tags: extractKeys(point, tags),
 		fields: extractKeys(point, fields),
