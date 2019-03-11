@@ -47,6 +47,8 @@ const lastSyncTime = new prometheus.Gauge({
 	help: 'Timestamp of the last successful sync'
 });
 
+let lastSyncTimeRaw = 0;
+
 const flatten = list => list.reduce(
 	(a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []
 );
@@ -59,7 +61,7 @@ Array.prototype.flatMap = function (cb, thisArg) {
 prometheus.collectDefaultMetrics({timeout: 1000});
 
 async function sync() {
-	let timeout = 10000;
+	let timeout = 60000;
 	try {
 		const measurements = await primary.getMeasurements(REPLICATOR_PRIMARY_DATABASE);
 
@@ -100,10 +102,11 @@ async function sync() {
 		synchronizedEntries.inc(syncedEntries);
 
 		if (syncedEntries > 0) {
-			timeout = 0;
+			timeout = 10000;
 		}
 
 		lastSyncTime.setToCurrentTime();
+		lastSyncTimeRaw = new Date();
 	} catch (e) {
 		console.log('Error during getting measurements', e);
 	}
@@ -122,7 +125,7 @@ function extractKeys(point, keys) {
 }
 
 async function replicate(lastSync, measurement, tags, fields) {
-	const data = await primary.query(`SELECT * FROM ${measurement} WHERE time > ${lastSync.getNanoTime()} ORDER BY time ASC LIMIT 20000`);
+	const data = await primary.query(`SELECT * FROM ${measurement} WHERE time > ${lastSync.getNanoTime()} ORDER BY time ASC LIMIT 5000`);
 	if (data.length === 0) {
 		return 0;
 	}
@@ -143,8 +146,16 @@ async function replicate(lastSync, measurement, tags, fields) {
 	return data.length;
 }
 
+function checkAlive() {
+	if(((new Date()) - lastSyncTimeRaw) > 5*60*1000) {
+		console.log('No Sync for 5 minutes');
+		process.exit(1);
+	}
+}
+
 (async function () {
 	setTimeout(sync, 0);
+	setInterval(checkAlive, 5*60*1000);
 })();
 
 app.get('/metrics', (req, res) => {
