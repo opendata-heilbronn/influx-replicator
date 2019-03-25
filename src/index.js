@@ -49,6 +49,11 @@ const lastSyncTime = new prometheus.Gauge({
 
 let lastSyncTimeRaw = 0;
 
+const errorCount = new prometheus.Counter({
+	name: 'influx_replication_error_count',
+	help: 'Counter of error events'
+});
+
 const flatten = list => list.reduce(
 	(a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []
 );
@@ -95,6 +100,7 @@ async function sync() {
 				console.log('Measurement', m, 'Last primary', lastPrimary[0].time.toNanoISOString(), 'Last secondary', lastSecondary[0].time.toNanoISOString());
 				syncedEntries += await replicate(lastSecondary[0].time, m, tags, fields);
 			} catch (e) {
+				errorCount.inc();
 				console.log('Error during measurement export', e)
 			}
 		}
@@ -108,6 +114,7 @@ async function sync() {
 		lastSyncTime.setToCurrentTime();
 		lastSyncTimeRaw = new Date();
 	} catch (e) {
+		errorCount.inc();
 		console.log('Error during getting measurements', e);
 	}
 
@@ -117,7 +124,7 @@ async function sync() {
 function extractKeys(point, keys) {
 	let retTags = {};
 	for (let t of keys) {
-		if (point[t] !== null) {
+		if (point[t] !== null && point[t] !== undefined) {
 			retTags[t] = point[t];
 		}
 	}
@@ -141,6 +148,7 @@ async function replicate(lastSync, measurement, tags, fields) {
 		await secondary.writeMeasurement(measurement, sendData);
 
 	} catch (e) {
+		errorCount.inc();
 		console.log('Replication error', e.message);
 	}
 	return data.length;
