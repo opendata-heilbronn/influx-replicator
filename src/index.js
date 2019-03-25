@@ -56,12 +56,14 @@ const errorCount = new prometheus.Counter({
 
 const primaryTime = new prometheus.Gauge({
 	name: 'influx_replication_primary_time',
-	help: 'Time of the last primary entry'
+	help: 'Time of the last primary entry',
+	labelNames: ['measurement']
 });
 
 const secondaryTime = new prometheus.Gauge({
 	name: 'influx_replication_secondary_time',
-	help: 'Time of the last secondary entry'
+	help: 'Time of the last secondary entry',
+	labelNames: ['measurement']
 });
 
 const flatten = list => list.reduce(
