@@ -54,6 +54,16 @@ const errorCount = new prometheus.Counter({
 	help: 'Counter of error events'
 });
 
+const primaryTime = new prometheus.Gauge({
+	name: 'influx_replication_primary_time',
+	help: 'Time of the last primary entry'
+});
+
+const secondaryTime = new prometheus.Gauge({
+	name: 'influx_replication_secondary_time',
+	help: 'Time of the last secondary entry'
+});
+
 const flatten = list => list.reduce(
 	(a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []
 );
@@ -98,6 +108,10 @@ async function sync() {
 				}
 
 				console.log('Measurement', m, 'Last primary', lastPrimary[0].time.toNanoISOString(), 'Last secondary', lastSecondary[0].time.toNanoISOString());
+
+				primaryTime.set({measurement: m}, Number.parseInt(lastPrimary[0].time.getNanoTime()) / 1000);
+				secondaryTime.set({measurement: m}, Number.parseInt(lastSecondary[0].time.getNanoTime()) / 1000);
+
 				syncedEntries += await replicate(lastSecondary[0].time, m, tags, fields);
 			} catch (e) {
 				errorCount.inc();
