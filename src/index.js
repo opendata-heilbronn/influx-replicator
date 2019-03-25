@@ -102,7 +102,7 @@ async function sync() {
 		synchronizedEntries.inc(syncedEntries);
 
 		if (syncedEntries > 0) {
-			timeout = 10000;
+			timeout = 1000;
 		}
 
 		lastSyncTime.setToCurrentTime();
