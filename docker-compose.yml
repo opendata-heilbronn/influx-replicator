@@ -3,7 +3,7 @@ services:
   replicator:
     image: repo.cfhn.it/infrastructure/influx-replicator/influx-replicator
     environment:
-      REPLICATOR_PRIMARY_HOST: 192.168.11.10
+      REPLICATOR_PRIMARY_HOST: 192.168.11.12
       REPLICATOR_PRIMARY_PORT: 8086
       REPLICATOR_PRIMARY_PROTO: http
       REPLICATOR_PRIMARY_DATABASE: solar
